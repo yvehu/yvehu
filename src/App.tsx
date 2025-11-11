@@ -267,18 +267,44 @@ function App() {
         containerWidth = Math.max(window.innerWidth - sidebarWidth - 100, 600)
       }
       
+      // Detect mobile and adjust parameters for compact-content
+      const isMobile = window.innerWidth <= 768
+      const isSmallMobile = window.innerWidth <= 480
+      const fontSize = isSmallMobile ? 11 : isMobile ? 12 : 16
+      const lineNumberWidth = isSmallMobile ? 18 : isMobile ? 20 : 48
+      const linePaddingLeft = isSmallMobile ? 10 : isMobile ? 12 : 16 // editor-line左侧padding
+      const linePaddingRight = isSmallMobile ? 0 : isMobile ? 1 : 16 // editor-line右侧padding
+      const lineNumberPadding = isSmallMobile ? 4 : isMobile ? 4 : 8
+      const rightPadding = 0 // compact-content has 0 right padding
+      
       const allLines: string[] = []
       
       content.forEach((line) => {
         if (line === '') {
           allLines.push('')
         } else {
-          const splitLines = splitLongLine(line, containerWidth)
-          splitLines.forEach((splitLine) => {
-            allLines.push(splitLine)
-          })
+          // For desktop, don't split the AI interest line to keep it as one paragraph
+          const isDesktop = !isMobile && !isSmallMobile
+          const isAILine = line.includes('她尤其关注 AI 在上述领域的开发过程中的应用')
+          
+          if (isDesktop && isAILine) {
+            // Keep the entire line without splitting on desktop
+            allLines.push(line)
+          } else {
+            const splitLines = splitLongLine(line, containerWidth, fontSize, lineNumberWidth, linePaddingLeft, rightPadding, lineNumberPadding, linePaddingRight)
+            splitLines.forEach((splitLine) => {
+              allLines.push(splitLine)
+            })
+          }
         }
       })
+      
+      // Remove trailing empty lines on mobile for interests page
+      if (isMobile && currentPage === 'interests') {
+        while (allLines.length > 0 && allLines[allLines.length - 1] === '') {
+          allLines.pop()
+        }
+      }
       
       setSplitContent(allLines)
     }
@@ -500,7 +526,7 @@ function App() {
   }
 
   // Helper function to split long lines into multiple lines based on container width
-  const splitLongLine = (text: string, containerWidth: number, fontSize: number = 16, fontFamily: string = '"Fira Code", "JetBrains Mono", "Consolas", monospace'): string[] => {
+  const splitLongLine = (text: string, containerWidth: number, fontSize: number = 16, lineNumberWidth: number = 48, linePaddingLeft: number = 16, rightPadding: number = 90, lineNumberPadding: number = 8, linePaddingRight: number = 16, fontFamily: string = '"Fira Code", "JetBrains Mono", "Consolas", monospace'): string[] => {
     if (!text || text.trim() === '') return [text]
     
     // Create a temporary element to measure text width
@@ -522,8 +548,9 @@ function App() {
       measureEl.textContent = testLine
       const width = measureEl.offsetWidth
       
-      // Account for padding (16px left + 16px right) and line number width (48px + 8px padding)
-      const availableWidth = containerWidth - 16 - 16 - 48 - 8 - 90 // padding + line number + right padding
+      // Account for: line number width + line number padding + line left padding + line right padding + content right padding
+      // Use 98% of available width to allow text to fill the line better while avoiding overflow
+      const availableWidth = (containerWidth - lineNumberWidth - lineNumberPadding - linePaddingLeft - linePaddingRight - rightPadding) * 0.98
       
       if (width > availableWidth && currentLine !== '') {
         lines.push(currentLine.trimEnd())
@@ -2898,7 +2925,10 @@ function App() {
 
           {/* Editor Window */}
           <main className="editor-window">
-            <div className="editor-content" ref={editorContentRef}>
+            <div 
+              className={`editor-content ${['interests', 'favorites', 'dreams'].includes(currentPage) ? 'compact-content' : ''}`}
+              ref={editorContentRef}
+            >
               {(() => {
                 const shouldSplitLines = ['interests', 'favorites', 'dreams'].includes(currentPage)
                 
